@@ -5,31 +5,14 @@
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const desktop = matchMedia('(min-width: 900px) and (pointer: fine)');
   const gsap = window.gsap, ScrollTrigger = window.ScrollTrigger;
-  const state = { hero: 0, heroView: 'frame', room: 0, roomView: 'space', event: 'workshop' };
-  const heights = { 'window-lounge':1559, 'portrait-curtains':1351, cyclorama:1200, 'hero-blazer':1201, 'kids-corner':1200, 'kids-detail':1149, 'kids-pink':1350, 'hero-gold':1958, 'workshop-windows':1200, 'workshop-artist':1201, 'events-table':1260, disco:1350, 'couple-maternity':1329, 'couple-bw':1573, 'family-white':1351 };
   const galleries = window.WHITE_STUDIO_GALLERIES || {};
-  const heroPairs = [
-    { name:'Циклорама · 36 м²', space:'cyclorama', frame:'couple-bw', spaceAlt:'Просторная белая циклорама White Studio', frameAlt:'Чёрно-белый портрет обнимающейся пары в White Studio', spaceCaption:'Чистый фон. Полная свобода.', frameCaption:'Когда всё внимание — на вас.' },
-    { name:'Панорамные окна', space:'window-lounge', frame:'portrait-curtains', spaceAlt:'Локация White Studio с панорамными окнами, светлыми шторами и диваном', frameAlt:'Портрет девушки у светлых штор в White Studio', spaceCaption:'Свет, который меняется вместе с днём.', frameCaption:'То же пространство. Ваша история.' }
-  ];
-  const rooms = [
-    { name:'Циклорама', description:'36 м² чистого пространства. Белый фон без видимых границ для портретов, fashion-съёмок и ваших экспериментов.', note:'36 м² · белый фон', space:'cyclorama', frame:'hero-blazer', spaceLabel:'Пространство', frameLabel:'В кадре', spaceAlt:'Белая циклорама площадью 36 квадратных метров в White Studio', frameAlt:'Fashion-съёмка девушки на белой циклораме' },
-    { name:'Панорамные окна', description:'Мягкий дневной свет, светлые ткани и уютный диван. Локация для спокойных портретов, семейных историй и праздничных съёмок.', note:'Дневной свет · сезонный декор', space:'window-lounge', frame:'portrait-curtains', spaceLabel:'Пространство', frameLabel:'В кадре', spaceAlt:'Панорамные окна, диван и праздничный декор White Studio', frameAlt:'Девушка в белом платье у штор White Studio' },
-    { name:'Детская локация', description:'Мягкие фактуры, тёплые детали и уютный уголок для самых маленьких. Здесь легко быть собой и играть, пока появляются живые кадры.', note:'Мягкие фактуры · уютные детали', space:'kids-corner', frame:'kids-detail', spaceLabel:'Пространство', frameLabel:'Детали', spaceAlt:'Детская локация с зелёными шторами, игрушками и мягкими подушками', frameAlt:'Детали детской локации: плед, подушки и мягкая игрушка' },
-    { name:'Цветные фоны', description:'Бумажные фоны для другого настроения. От нежных детских портретов до выразительной fashion-съёмки — выбирайте цвет под свою идею.', note:'Цветные бумажные фоны', space:'kids-pink', frame:'hero-gold', spaceLabel:'Розовый фон', frameLabel:'Красный фон', spaceAlt:'Детский портрет на розовом бумажном фоне', frameAlt:'Fashion-портрет в золотом платье на красном фоне' }
-  ];
-  const events = {
-    workshop:{ title:'Встречаться. Вдохновляться. Создавать.', copy:'Творческие мастер-классы в красивом пространстве. Собираемся за одним столом, пробуем новое и уносим с собой больше, чем готовую работу.', first:'workshop-windows', second:'workshop-artist', firstAlt:'Стол и мольберты для творческого мастер-класса у панорамных окон', secondAlt:'Участница творческого мастер-класса в White Studio' },
-    party:{ title:'Ваши люди. Ваш особенный повод.', copy:'Стильный девичник, тёплая встреча или нестандартный проект. Обсудим вашу идею и вместе придумаем, как наполнить этот день впечатлениями.', first:'events-table', second:'disco', firstAlt:'Праздничная сервировка стола в White Studio', secondAlt:'Зеркальные диско-шары и солнечные блики в студии' },
-    gender:{ title:'Моменты, которых так ждёте.', copy:'Гендер-пати и встречи в ожидании малыша. Пространство для близких, искренних эмоций и фотографий, к которым захочется возвращаться.', first:'couple-maternity', second:'family-white', firstAlt:'Фотосессия пары в ожидании малыша на светлом фоне', secondAlt:'Семейная фотография в White Studio' }
-  };
   const booking = {
     'Съёмка':{ title:'Давайте запланируем съёмку.', note:'Все локации находятся в одном зале. Позвоните нам — подберём время, обсудим вашу идею и стоимость аренды.' },
     'Событие':{ title:'Давайте создадим событие.', note:'Расскажите о формате и количестве гостей. Обсудим детали, дату и стоимость вашего события.' },
     'Сертификат':{ title:'Подарите время для себя.', note:'Позвоните нам, чтобы выбрать подарочный сертификат и уточнить его стоимость и оформление.' }
   };
   let lifecycle, lenis, lenisTick, motionContext, currentDialog, returnFocus;
-  let introPlayed=false, observers=[], swaps=new Map(), galleryItems=[], galleryIndex=0, galleryRequest=0, refreshFrame=0;
+  let introPlayed=false, observers=[], galleryItems=[], galleryIndex=0, galleryRequest=0, refreshFrame=0;
   let savedBodyOverflow='', savedRootOverflow='';
   const text=(s,value)=>{const el=$(s);if(el)el.textContent=value;};
   const instant=e=>reduced.matches||!!(e&&e.type==='click'&&e.detail===0)||!!(e&&e.type==='keydown');
@@ -41,14 +24,6 @@
     if(!ScrollTrigger||refreshFrame)return;
     refreshFrame=requestAnimationFrame(()=>{refreshFrame=0;ScrollTrigger.refresh();lenis?.resize();});
   }
-  function cancelSwap(image){
-    const previous=swaps.get(image);
-    if(previous){previous.cancelled=true;previous.timeline?.kill();previous.clone?.remove();}
-    gsap?.killTweensOf(image);
-    image.style.removeProperty('transform');image.style.removeProperty('opacity');
-    (image.closest('[data-image-stage]')||image.parentElement)?.removeAttribute('aria-busy');
-    swaps.delete(image);
-  }
   function clearImageError(stage){stage?.querySelector('[data-image-error]')?.remove();}
   function imageError(stage,retry){
     if(!stage)return;clearImageError(stage);
@@ -56,62 +31,6 @@
     notice.textContent='Фото не загрузилось. Повторить';
     Object.assign(notice.style,{position:'absolute',left:'16px',right:'16px',bottom:'16px',zIndex:'3',padding:'12px 16px',font:'inherit',fontSize:'13px',lineHeight:'1.4',color:'#28221e',background:'#faf8f3',border:'1px solid #d6cec4',borderRadius:'4px',cursor:'pointer'});
     listen(notice,'click',e=>{e.preventDefault();e.stopPropagation();retry(instant(e));});stage.append(notice);
-  }
-  // Decode before replacement: a slow connection never exposes a blank stage.
-  async function setPhoto(image,name,alt,{immediate=false,direction=1}={}){
-    if(!image)return;
-    cancelSwap(image);
-    const swap={cancelled:false,clone:null,timeline:null};swaps.set(image,swap);
-    let source=path(name);const stage=image.closest('[data-image-stage]')||image.parentElement;
-    clearImageError(stage);
-    stage?.setAttribute('aria-busy','true');
-    const preload=new Image();preload.src=source;
-    try{await preload.decode();}catch{
-      if(swap.cancelled)return;
-      source=path(name,480);preload.src=source;
-      try{await preload.decode();}catch{
-        if(!swap.cancelled){stage?.removeAttribute('aria-busy');swaps.delete(image);imageError(stage,now=>setPhoto(image,name,alt,{immediate:now,direction}));}
-        return;
-      }
-    }
-    if(swap.cancelled||lifecycle.signal.aborted)return;
-    const animate=gsap&&!reduced.matches&&!immediate&&image.getAttribute('src')!==source;
-    if(animate){
-      const computed=getComputedStyle(image), clone=image.cloneNode(false);
-      clone.removeAttribute('id');clone.removeAttribute('fetchpriority');clone.alt='';clone.setAttribute('aria-hidden','true');clone.dataset.transitionClone='';
-      Object.assign(clone.style,{position:'absolute',inset:'0',width:'100%',height:'100%',objectFit:computed.objectFit,objectPosition:computed.objectPosition,zIndex:'2',pointerEvents:'none',transform:'none',opacity:'1'});
-      stage.append(clone);swap.clone=clone;
-    }
-    image.dataset.asset=name;image.src=source;
-    if(source===path(name,480))image.removeAttribute('srcset');else image.srcset=`${path(name,480)} 480w, ${source} 900w`;
-    image.alt=alt;image.width=900;image.height=heights[name]||1350;
-    const opener=image.closest('[data-photo]');if(opener){opener.dataset.photo=path(name,1400);opener.dataset.caption=alt;}
-    stage?.removeAttribute('aria-busy');
-    if(animate){
-      gsap.set(image,{xPercent:5*direction});
-      swap.timeline=gsap.timeline({onComplete:()=>{swap.clone?.remove();image.style.removeProperty('transform');swaps.delete(image);}})
-        .to(swap.clone,{xPercent:-100*direction,duration:0.38,ease:'power3.inOut'},0)
-        .to(image,{xPercent:0,duration:0.38,ease:'power3.out'},0);
-    }else swaps.delete(image);
-    refresh();
-  }
-  function renderHero(immediate=false,direction=1){
-    const pair=heroPairs[state.hero],view=state.heroView;
-    press('[data-hero-view]','heroView',view);text('#hero-room',pair.name);
-    text('#hero-counter',`${String(state.hero+1).padStart(2,'0')} / 02`);text('#hero-caption',view==='frame'?'В кадре':'Пространство');
-    setPhoto($('#hero-image'),pair[view],pair[`${view}Alt`],{immediate,direction});
-  }
-  function renderRoom(immediate=false,direction=1){
-    const room=rooms[state.room],view=state.roomView;
-    press('[data-room]','room',state.room);press('[data-room-view]','roomView',view);
-    text('#room-name',room.name);text('#room-description',room.description);text('#room-note',room.note);text('#room-count',`${String(state.room+1).padStart(2,'0')} / 04`);
-    $$('[data-room-view]').forEach(b=>{b.textContent=room[`${b.dataset.roomView}Label`];});
-    $('#room-stage')?.classList.toggle('is-gold',room[view]==='hero-gold');
-    setPhoto($('#room-image'),room[view],room[`${view}Alt`],{immediate,direction});
-  }
-  function renderEvent(immediate=false){
-    const event=events[state.event];press('[data-event]','event',state.event);text('#event-title',event.title);text('#event-copy',event.copy);
-    setPhoto($('#event-image'),event.first,event.firstAlt,{immediate});setPhoto($('#event-second-image'),event.second,event.secondAlt,{immediate});
   }
   // No preventDefault: vertical scroll and pinch gestures remain native.
   function swipe(element,onSwipe,{vertical=false}={}){
@@ -202,7 +121,6 @@
   function destroyMotion(cancelPending=false){
     motionContext?.revert();motionContext=null;
     if(lenisTick&&gsap)gsap.ticker.remove(lenisTick);lenisTick=null;lenis?.destroy();lenis=null;
-    for(const [image,swap] of [...swaps])if(cancelPending||swap.timeline)cancelSwap(image);
   }
   function setupMotion(){
     destroyMotion();if(!gsap||reduced.matches)return;
@@ -240,14 +158,6 @@
   }
   function init(){
     lifecycle=new AbortController();document.documentElement.classList.add('js-ready');
-    $$('[data-hero-view]').forEach(b=>listen(b,'click',e=>{if(state.heroView===b.dataset.heroView)return;state.heroView=b.dataset.heroView;renderHero(instant(e));}));
-    $$('[data-hero-step]').forEach(b=>listen(b,'click',e=>{const d=Number(b.dataset.heroStep);state.hero=(state.hero+d+heroPairs.length)%heroPairs.length;renderHero(instant(e),d);}));
-    swipe($('#hero-stage'),d=>{state.hero=(state.hero+d+heroPairs.length)%heroPairs.length;renderHero(false,d);});
-    $$('[data-room]').forEach(b=>listen(b,'click',e=>{const next=Number(b.dataset.room);if(state.room===next)return;const d=next>state.room?1:-1;state.room=next;state.roomView='space';renderRoom(instant(e),d);}));
-    $$('[data-room-view]').forEach(b=>listen(b,'click',e=>{if(state.roomView===b.dataset.roomView)return;state.roomView=b.dataset.roomView;renderRoom(instant(e));}));
-    $$('[data-room-prev], [data-room-next]').forEach(b=>listen(b,'click',e=>{const d=b.hasAttribute('data-room-prev')?-1:1;state.room=(state.room+d+rooms.length)%rooms.length;state.roomView='space';renderRoom(instant(e),d);}));
-    swipe($('#room-stage'),d=>{state.room=(state.room+d+rooms.length)%rooms.length;state.roomView='space';renderRoom(false,d);});
-    $$('[data-event]').forEach(b=>listen(b,'click',e=>{if(!events[b.dataset.event]||state.event===b.dataset.event)return;state.event=b.dataset.event;renderEvent(instant(e));}));
     $$('[data-booking]').forEach(b=>listen(b,'click',e=>{e.preventDefault();configureBooking(b.dataset.booking);openDialog($('#booking-dialog'),b,instant(e));}));
     $$('[data-format]').forEach(b=>listen(b,'click',()=>configureBooking(b.dataset.format)));
     $$('[data-gallery-count]').forEach(el=>{el.textContent=String(galleries[el.dataset.galleryCount]?.length||0);});
