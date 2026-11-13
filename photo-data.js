@@ -1,9 +1,10 @@
 /* All approved studio photographs. Full-size files load only when a gallery opens. */
 window.WHITE_STUDIO_GALLERIES = {
   portraits: [
-    {name:'couple-bw',alt:'Чёрно-белый портрет обнимающейся пары',width:1206,height:2108},
     {name:'portrait-bw',alt:'Чёрно-белый портрет девушки в белом костюме',width:1707,height:2560},
+    {name:'couple-maternity',alt:'Фотосессия пары в ожидании малыша',width:1206,height:1781},
     {name:'family-white',alt:'Семейная фотография на белом фоне',width:1706,height:2560},
+    {name:'couple-bw',alt:'Чёрно-белый портрет обнимающейся пары',width:1206,height:2108},
     {name:'maternity-lounge',alt:'Девушка в белом платье у дивана и светлых штор',width:1707,height:2560},
     {name:'portrait-curtains',alt:'Девушка в светлом платье у панорамных окон',width:1706,height:2560},
     {name:'portrait-double-curtains',alt:'Портрет с двойной экспозицией у светлых штор',width:1707,height:2560},
@@ -14,7 +15,6 @@ window.WHITE_STUDIO_GALLERIES = {
     {name:'portrait-double-exposure',alt:'Чёрно-белый женский портрет с двойной экспозицией',width:1780,height:2560},
     {name:'portrait-burgundy',alt:'Портрет девушки в бордовом платье',width:1707,height:2560},
     {name:'portrait-christmas',alt:'Девушка в чёрном платье у украшенной ёлки',width:1706,height:2560},
-    {name:'couple-maternity',alt:'Фотосессия пары в ожидании малыша',width:1206,height:1781},
     {name:'family-windows',alt:'Семейная съёмка у панорамных окон и ёлки',width:1707,height:2560},
     {name:'family-christmas',alt:'Мама с детьми и подарком у ёлки',width:1707,height:2560},
     {name:'siblings',alt:'Дети на белом комоде у светлых штор',width:1706,height:2560},
