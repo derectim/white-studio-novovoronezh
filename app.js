@@ -6,10 +6,11 @@
   const desktop = matchMedia('(min-width: 900px) and (pointer: fine)');
   const gsap = window.gsap, ScrollTrigger = window.ScrollTrigger;
   const state = { hero: 0, heroView: 'frame', room: 0, roomView: 'space', event: 'workshop' };
-  const heights = { 'window-lounge':1559, 'portrait-curtains':1351, cyclorama:1200, 'hero-blazer':1201, 'kids-corner':1200, 'kids-detail':1149, 'kids-pink':1350, 'hero-gold':1958, 'workshop-windows':1200, 'workshop-artist':1201, 'events-table':1260, disco:1350, 'couple-maternity':1329, 'family-white':1351 };
+  const heights = { 'window-lounge':1559, 'portrait-curtains':1351, cyclorama:1200, 'hero-blazer':1201, 'kids-corner':1200, 'kids-detail':1149, 'kids-pink':1350, 'hero-gold':1958, 'workshop-windows':1200, 'workshop-artist':1201, 'events-table':1260, disco:1350, 'couple-maternity':1329, 'couple-bw':1573, 'family-white':1351 };
+  const galleries = window.WHITE_STUDIO_GALLERIES || {};
   const heroPairs = [
-    { name:'Панорамные окна', space:'window-lounge', frame:'portrait-curtains', spaceAlt:'Локация White Studio с панорамными окнами, светлыми шторами и диваном', frameAlt:'Портрет девушки у светлых штор в White Studio', spaceCaption:'Свет, который меняется вместе с днём.', frameCaption:'То же пространство. Ваша история.' },
-    { name:'Циклорама · 36 м²', space:'cyclorama', frame:'hero-blazer', spaceAlt:'Просторная белая циклорама White Studio', frameAlt:'Fashion-портрет на белой циклораме White Studio', spaceCaption:'Чистый фон. Полная свобода.', frameCaption:'Когда всё внимание — на вас.' }
+    { name:'Циклорама · 36 м²', space:'cyclorama', frame:'couple-bw', spaceAlt:'Просторная белая циклорама White Studio', frameAlt:'Чёрно-белый портрет обнимающейся пары в White Studio', spaceCaption:'Чистый фон. Полная свобода.', frameCaption:'Когда всё внимание — на вас.' },
+    { name:'Панорамные окна', space:'window-lounge', frame:'portrait-curtains', spaceAlt:'Локация White Studio с панорамными окнами, светлыми шторами и диваном', frameAlt:'Портрет девушки у светлых штор в White Studio', spaceCaption:'Свет, который меняется вместе с днём.', frameCaption:'То же пространство. Ваша история.' }
   ];
   const rooms = [
     { name:'Циклорама', description:'36 м² чистого пространства. Белый фон без видимых границ для портретов, fashion-съёмок и ваших экспериментов.', note:'36 м² · белый фон', space:'cyclorama', frame:'hero-blazer', spaceLabel:'Пространство', frameLabel:'В кадре', spaceAlt:'Белая циклорама площадью 36 квадратных метров в White Studio', frameAlt:'Fashion-съёмка девушки на белой циклораме' },
@@ -28,7 +29,7 @@
     'Сертификат':{ title:'Подарите время для себя.', note:'Позвоните нам, чтобы выбрать подарочный сертификат и уточнить его стоимость и оформление.' }
   };
   let lifecycle, lenis, lenisTick, motionContext, currentDialog, returnFocus;
-  let introPlayed=false, observers=[], swaps=new Map(), galleryItems=[], galleryIndex=0, refreshFrame=0;
+  let introPlayed=false, observers=[], swaps=new Map(), galleryItems=[], galleryIndex=0, galleryRequest=0, refreshFrame=0;
   let savedBodyOverflow='', savedRootOverflow='';
   const text=(s,value)=>{const el=$(s);if(el)el.textContent=value;};
   const instant=e=>reduced.matches||!!(e&&e.type==='click'&&e.detail===0)||!!(e&&e.type==='keydown');
@@ -135,20 +136,67 @@
     returnFocus=trigger||document.activeElement;currentDialog=dialog;
     savedBodyOverflow=document.body.style.overflow;savedRootOverflow=document.documentElement.style.overflow;
     document.body.style.overflow='hidden';document.documentElement.style.overflow='hidden';lenis?.stop();dialog.showModal();
-    if(gsap&&!reduced.matches&&!immediate)gsap.fromTo(dialog,{y:dialog.id==='booking-dialog'?24:8,opacity:0.7},{y:0,opacity:1,duration:0.24,ease:'power3.out',clearProps:'transform,opacity',overwrite:true});
+    if(gsap&&!reduced.matches&&!immediate){
+      const bookingSheet=dialog.id==='booking-dialog',mobileSheet=bookingSheet&&matchMedia('(max-width: 700px)').matches;
+      dialog.classList.add('is-entering');
+      gsap.fromTo(dialog,mobileSheet?{yPercent:100,y:0,scale:1,opacity:1}:bookingSheet?{y:28,yPercent:0,scale:0.985,opacity:0}:{y:8,yPercent:0,scale:1,opacity:0.7},
+        {y:0,yPercent:0,scale:1,opacity:1,duration:bookingSheet?(mobileSheet?0.58:0.42):0.24,ease:'power3.out',clearProps:'transform,opacity',overwrite:true,onComplete:()=>dialog.classList.remove('is-entering')});
+    }
   }
   function afterClose(dialog){
-    gsap?.killTweensOf(dialog);dialog.style.removeProperty('transform');dialog.style.removeProperty('opacity');
+    gsap?.killTweensOf(dialog);dialog.classList.remove('is-entering');dialog.style.removeProperty('transform');dialog.style.removeProperty('opacity');
     if(currentDialog!==dialog)return;currentDialog=null;
+    if(dialog.id==='gallery-dialog')galleryRequest++;
     document.body.style.overflow=savedBodyOverflow;document.documentElement.style.overflow=savedRootOverflow;lenis?.start();
     if(returnFocus?.isConnected)returnFocus.focus({preventScroll:true});returnFocus=null;
   }
-  function renderGallery(){
+  function galleryPhoto(button){
+    const name=button.dataset.photo?.match(/\/([^/]+)-(?:480|900|1400)\.webp$/)?.[1];
+    if(!name)return null;
+    return Object.values(galleries).flat().find(photo=>photo.name===name)||{name,alt:button.dataset.caption||$('img',button)?.alt||'Фотография White Studio'};
+  }
+  function buildGalleryThumbnails(){
+    const strip=$('#gallery-thumbs');if(!strip)return;strip.replaceChildren();
+    const fragment=document.createDocumentFragment();
+    galleryItems.forEach((item,index)=>{
+      const button=document.createElement('button'),thumb=document.createElement('img');
+      button.type='button';button.className='gallery-thumb';button.dataset.galleryIndex=String(index);
+      button.setAttribute('aria-label',`Фото ${index+1}: ${item.alt}`);
+      thumb.src=path(item.name,480);thumb.alt='';thumb.width=item.width||480;thumb.height=item.height||640;thumb.loading='lazy';thumb.decoding='async';
+      button.append(thumb);fragment.append(button);
+    });
+    strip.append(fragment);
+  }
+  function openGallery(group,trigger,immediate=false){
+    const selected=trigger.hasAttribute('data-photo')?galleryPhoto(trigger):null;
+    galleryItems=[...(galleries[group]||[])];
+    if(!galleryItems.length)galleryItems=$$('[data-photo]').filter(item=>!group||item.dataset.gallery===group).map(galleryPhoto).filter(Boolean);
+    if(selected&&!galleryItems.some(item=>item.name===selected.name))galleryItems.unshift(selected);
+    if(!galleryItems.length)return;
+    galleryIndex=selected?Math.max(0,galleryItems.findIndex(item=>item.name===selected.name)):0;
+    buildGalleryThumbnails();openDialog($('#gallery-dialog'),trigger,immediate);renderGallery();
+  }
+  async function renderGallery(){
     const item=galleryItems[galleryIndex],image=$('#gallery-image');if(!item||!image)return;
-    image.src=item.dataset.photo;image.removeAttribute('srcset');image.alt=item.dataset.caption||$('img',item)?.alt||'Фотография White Studio';
-    text('#gallery-caption',image.alt);text('#gallery-count',`${String(galleryIndex+1).padStart(2,'0')} / ${String(galleryItems.length).padStart(2,'0')}`);
+    const request=++galleryRequest,stage=image.parentElement;stage.setAttribute('aria-busy','true');clearImageError(stage);
+    text('#gallery-caption',item.alt);text('#gallery-count',`${String(galleryIndex+1).padStart(2,'0')} / ${String(galleryItems.length).padStart(2,'0')}`);
     [$('#gallery-prev'),$('#gallery-next')].forEach(b=>{if(b)b.disabled=galleryItems.length<2;});
-    $('#gallery-dialog')?.classList.toggle('is-gold',/hero-gold/.test(item.dataset.photo));
+    $$('#gallery-thumbs [data-gallery-index]').forEach(button=>{
+      if(Number(button.dataset.galleryIndex)===galleryIndex){button.setAttribute('aria-current','true');button.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'});}
+      else button.removeAttribute('aria-current');
+    });
+    let source=path(item.name,1400);const preload=new Image();preload.src=source;
+    try{await preload.decode();}catch{
+      if(request!==galleryRequest)return;source=path(item.name,900);preload.src=source;
+      try{await preload.decode();}catch{
+        if(request===galleryRequest){stage.removeAttribute('aria-busy');imageError(stage,()=>renderGallery());}return;
+      }
+    }
+    if(request!==galleryRequest||lifecycle.signal.aborted)return;
+    image.src=source;image.removeAttribute('srcset');image.alt=item.alt;image.width=item.width||preload.naturalWidth;image.height=item.height||preload.naturalHeight;image.dataset.asset=item.name;
+    stage.removeAttribute('aria-busy');
+    $('#gallery-dialog')?.classList.toggle('is-gold',item.name==='hero-gold');
+    $('#gallery-dialog')?.classList.toggle('is-gobo',item.name==='gobo-original');
   }
   function stepGallery(direction){if(galleryItems.length<2)return;galleryIndex=(galleryIndex+direction+galleryItems.length)%galleryItems.length;renderGallery();}
   function destroyMotion(cancelPending=false){
@@ -202,7 +250,10 @@
     $$('[data-event]').forEach(b=>listen(b,'click',e=>{if(!events[b.dataset.event]||state.event===b.dataset.event)return;state.event=b.dataset.event;renderEvent(instant(e));}));
     $$('[data-booking]').forEach(b=>listen(b,'click',e=>{e.preventDefault();configureBooking(b.dataset.booking);openDialog($('#booking-dialog'),b,instant(e));}));
     $$('[data-format]').forEach(b=>listen(b,'click',()=>configureBooking(b.dataset.format)));
-    $$('[data-photo]').forEach(b=>listen(b,'click',e=>{e.preventDefault();const group=b.dataset.gallery;galleryItems=group?$$('[data-photo]').filter(item=>item.dataset.gallery===group):[b];galleryIndex=galleryItems.indexOf(b);renderGallery();openDialog($('#gallery-dialog'),b,instant(e));}));
+    $$('[data-gallery-count]').forEach(el=>{el.textContent=String(galleries[el.dataset.galleryCount]?.length||0);});
+    $$('[data-photo]').forEach(b=>listen(b,'click',e=>{e.preventDefault();openGallery(b.dataset.gallery,b,instant(e));}));
+    $$('[data-gallery-open]').forEach(b=>listen(b,'click',e=>{e.preventDefault();openGallery(b.dataset.galleryOpen,b,instant(e));}));
+    listen($('#gallery-thumbs'),'click',e=>{const button=e.target.closest('[data-gallery-index]');if(!button)return;galleryIndex=Number(button.dataset.galleryIndex);renderGallery();});
     listen($('#gallery-prev'),'click',()=>stepGallery(-1));listen($('#gallery-next'),'click',()=>stepGallery(1));swipe($('#gallery-image'),d=>stepGallery(d));
     $$('dialog').forEach(dialog=>{
       let backdropDown=false;listen(dialog,'pointerdown',e=>{backdropDown=e.target===dialog;});
