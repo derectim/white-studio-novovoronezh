@@ -5,32 +5,22 @@
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const desktop = matchMedia('(min-width: 900px) and (pointer: fine)');
   const gsap = window.gsap, ScrollTrigger = window.ScrollTrigger;
-  const galleries = window.WHITE_STUDIO_GALLERIES || {};
   const booking = {
     'Съёмка':{ title:'Давайте запланируем съёмку.', note:'Все локации находятся в одном зале. Позвоните нам — подберём время, обсудим вашу идею и стоимость аренды.' },
     'Событие':{ title:'Давайте создадим событие.', note:'Расскажите о формате и количестве гостей. Обсудим детали, дату и стоимость вашего события.' },
     'Сертификат':{ title:'Подарите время для себя.', note:'Позвоните нам, чтобы выбрать подарочный сертификат и уточнить его стоимость и оформление.' }
   };
   let lifecycle, lenis, lenisTick, motionContext, currentDialog, returnFocus;
-  let introPlayed=false, observers=[], galleryItems=[], galleryIndex=0, galleryRequest=0, refreshFrame=0;
+  let introPlayed=false, observers=[], refreshFrame=0;
   let savedBodyOverflow='', savedRootOverflow='';
   const text=(s,value)=>{const el=$(s);if(el)el.textContent=value;};
   const instant=e=>reduced.matches||!!(e&&e.type==='click'&&e.detail===0)||!!(e&&e.type==='keydown');
   const listen=(target,type,handler,options={})=>target?.addEventListener(type,handler,{...options,signal:lifecycle.signal});
   const press=(s,key,value)=>$$(s).forEach(b=>b.setAttribute('aria-pressed',String(b.dataset[key]===String(value))));
-  const path=(name,size=900)=>`assets/images/${name}-${size}.webp`;
 
   function refresh(){
     if(!ScrollTrigger||refreshFrame)return;
     refreshFrame=requestAnimationFrame(()=>{refreshFrame=0;ScrollTrigger.refresh();lenis?.resize();});
-  }
-  function clearImageError(stage){stage?.querySelector('[data-image-error]')?.remove();}
-  function imageError(stage,retry){
-    if(!stage)return;clearImageError(stage);
-    const notice=document.createElement('button');notice.type='button';notice.dataset.imageError='';notice.setAttribute('role','status');
-    notice.textContent='Фото не загрузилось. Повторить';
-    Object.assign(notice.style,{position:'absolute',left:'16px',right:'16px',bottom:'16px',zIndex:'3',padding:'12px 16px',font:'inherit',fontSize:'13px',lineHeight:'1.4',color:'#28221e',background:'#faf8f3',border:'1px solid #d6cec4',borderRadius:'4px',cursor:'pointer'});
-    listen(notice,'click',e=>{e.preventDefault();e.stopPropagation();retry(instant(e));});stage.append(notice);
   }
   // No preventDefault: vertical scroll and pinch gestures remain native.
   function swipe(element,onSwipe,{vertical=false}={}){
@@ -65,59 +55,61 @@
   function afterClose(dialog){
     gsap?.killTweensOf(dialog);dialog.classList.remove('is-entering');dialog.style.removeProperty('transform');dialog.style.removeProperty('opacity');
     if(currentDialog!==dialog)return;currentDialog=null;
-    if(dialog.id==='gallery-dialog')galleryRequest++;
     document.body.style.overflow=savedBodyOverflow;document.documentElement.style.overflow=savedRootOverflow;lenis?.start();
     if(returnFocus?.isConnected)returnFocus.focus({preventScroll:true});returnFocus=null;
   }
-  function galleryPhoto(button){
-    const name=button.dataset.photo?.match(/\/([^/]+)-(?:480|900|1400)\.webp$/)?.[1];
-    if(!name)return null;
-    return Object.values(galleries).flat().find(photo=>photo.name===name)||{name,alt:button.dataset.caption||$('img',button)?.alt||'Фотография White Studio'};
+
+
+  // Inline collections keep visitors in the same section and preserve scroll position.
+  const inlineGalleries=new Map();
+  function settleInlineGallery(entry){
+    entry.animation?.kill();entry.animation=null;
+    gsap?.killTweensOf(entry.inner);
+    entry.panel.hidden=!entry.open;entry.panel.inert=!entry.open;
+    entry.panel.style.removeProperty('height');entry.panel.style.removeProperty('overflow');
+    entry.inner.style.removeProperty('opacity');entry.inner.style.removeProperty('transform');
   }
-  function buildGalleryThumbnails(){
-    const strip=$('#gallery-thumbs');if(!strip)return;strip.replaceChildren();
-    const fragment=document.createDocumentFragment();
-    galleryItems.forEach((item,index)=>{
-      const button=document.createElement('button'),thumb=document.createElement('img');
-      button.type='button';button.className='gallery-thumb';button.dataset.galleryIndex=String(index);
-      button.setAttribute('aria-label',`Фото ${index+1}: ${item.alt}`);
-      thumb.src=path(item.name,480);thumb.alt='';thumb.width=item.width||480;thumb.height=item.height||640;thumb.loading='lazy';thumb.decoding='async';
-      button.append(thumb);fragment.append(button);
-    });
-    strip.append(fragment);
-  }
-  function openGallery(group,trigger,immediate=false){
-    const selected=trigger.hasAttribute('data-photo')?galleryPhoto(trigger):null;
-    galleryItems=[...(galleries[group]||[])];
-    if(!galleryItems.length)galleryItems=$$('[data-photo]').filter(item=>!group||item.dataset.gallery===group).map(galleryPhoto).filter(Boolean);
-    if(selected&&!galleryItems.some(item=>item.name===selected.name))galleryItems.unshift(selected);
-    if(!galleryItems.length)return;
-    galleryIndex=selected?Math.max(0,galleryItems.findIndex(item=>item.name===selected.name)):0;
-    buildGalleryThumbnails();openDialog($('#gallery-dialog'),trigger,immediate);renderGallery();
-  }
-  async function renderGallery(){
-    const item=galleryItems[galleryIndex],image=$('#gallery-image');if(!item||!image)return;
-    const request=++galleryRequest,stage=image.parentElement;stage.setAttribute('aria-busy','true');clearImageError(stage);
-    text('#gallery-caption',item.alt);text('#gallery-count',`${String(galleryIndex+1).padStart(2,'0')} / ${String(galleryItems.length).padStart(2,'0')}`);
-    [$('#gallery-prev'),$('#gallery-next')].forEach(b=>{if(b)b.disabled=galleryItems.length<2;});
-    $$('#gallery-thumbs [data-gallery-index]').forEach(button=>{
-      if(Number(button.dataset.galleryIndex)===galleryIndex){button.setAttribute('aria-current','true');button.scrollIntoView({block:'nearest',inline:'nearest',behavior:'auto'});}
-      else button.removeAttribute('aria-current');
-    });
-    let source=path(item.name,1400);const preload=new Image();preload.src=source;
-    try{await preload.decode();}catch{
-      if(request!==galleryRequest)return;source=path(item.name,900);preload.src=source;
-      try{await preload.decode();}catch{
-        if(request===galleryRequest){stage.removeAttribute('aria-busy');imageError(stage,()=>renderGallery());}return;
+  function toggleInlineGallery(group,open,trigger,immediate=false){
+    const entry=inlineGalleries.get(group);if(!entry||entry.open===open)return;
+    const {panel,inner,button,label}=entry;
+    const currentHeight=panel.hidden?0:panel.getBoundingClientRect().height;
+    entry.animation?.kill();gsap?.killTweensOf(inner);
+    entry.open=open;
+    button.setAttribute('aria-expanded',String(open));
+    $('.gallery-toggle-label',button).textContent=open?'Свернуть фотографии':label;
+    if(!open){
+      if(panel.contains(document.activeElement))button.focus({preventScroll:true});
+      const bounds=button.getBoundingClientRect();
+      if(bounds.top<18||bounds.bottom>window.innerHeight-90){
+        const destination=Math.max(0,bounds.top+window.scrollY-24);
+        if(lenis)lenis.scrollTo(destination,{immediate:true,force:true});
+        else window.scrollTo({top:destination,behavior:'instant'});
       }
     }
-    if(request!==galleryRequest||lifecycle.signal.aborted)return;
-    image.src=source;image.removeAttribute('srcset');image.alt=item.alt;image.width=item.width||preload.naturalWidth;image.height=item.height||preload.naturalHeight;image.dataset.asset=item.name;
-    stage.removeAttribute('aria-busy');
-    $('#gallery-dialog')?.classList.toggle('is-gold',item.name==='hero-gold');
-    $('#gallery-dialog')?.classList.toggle('is-gobo',item.name==='gobo-original');
+    panel.hidden=false;panel.inert=!open;
+    if(!gsap||reduced.matches||immediate){settleInlineGallery(entry);refresh();return;}
+    panel.style.overflow='hidden';
+    entry.animation=gsap.timeline({onComplete:()=>{settleInlineGallery(entry);refresh();}})
+      .fromTo(panel,{height:currentHeight},{height:open?inner.offsetHeight:0,duration:open?0.48:0.34,ease:open?'power3.out':'power2.inOut'},0);
+    if(open){
+      entry.animation.fromTo(inner,{opacity:0,y:12},{opacity:1,y:0,duration:0.4,ease:'power2.out'},0.04);
+    }else{
+      entry.animation.to(inner,{opacity:0,y:-6,duration:0.2,ease:'power2.in'},0);
+    }
   }
-  function stepGallery(direction){if(galleryItems.length<2)return;galleryIndex=(galleryIndex+direction+galleryItems.length)%galleryItems.length;renderGallery();}
+  function setupInlineGalleries(){
+    inlineGalleries.clear();
+    $$('[data-gallery-open]').forEach(button=>{
+      const group=button.dataset.galleryOpen,panel=document.getElementById(button.getAttribute('aria-controls'));
+      if(!panel)return;
+      const count=$$('.inline-gallery-photo',panel).length;
+      const entry={button,panel,inner:$('.inline-gallery-inner',panel),open:button.getAttribute('aria-expanded')==='true',label:'Ещё фотографии · '+count,animation:null};
+      inlineGalleries.set(group,entry);
+      listen(button,'click',e=>toggleInlineGallery(group,!entry.open,button,instant(e)));
+      $$('[data-gallery-close]',panel).forEach(close=>listen(close,'click',e=>toggleInlineGallery(group,false,close,instant(e))));
+    });
+    listen(window,'resize',()=>{for(const entry of inlineGalleries.values())if(entry.animation)settleInlineGallery(entry);refresh();});
+  }
   function destroyMotion(cancelPending=false){
     motionContext?.revert();motionContext=null;
     if(lenisTick&&gsap)gsap.ticker.remove(lenisTick);lenisTick=null;lenis?.destroy();lenis=null;
@@ -160,11 +152,7 @@
     lifecycle=new AbortController();document.documentElement.classList.add('js-ready');
     $$('[data-booking]').forEach(b=>listen(b,'click',e=>{e.preventDefault();configureBooking(b.dataset.booking);openDialog($('#booking-dialog'),b,instant(e));}));
     $$('[data-format]').forEach(b=>listen(b,'click',()=>configureBooking(b.dataset.format)));
-    $$('[data-gallery-count]').forEach(el=>{el.textContent=String(galleries[el.dataset.galleryCount]?.length||0);});
-    $$('[data-photo]').forEach(b=>listen(b,'click',e=>{e.preventDefault();openGallery(b.dataset.gallery,b,instant(e));}));
-    $$('[data-gallery-open]').forEach(b=>listen(b,'click',e=>{e.preventDefault();openGallery(b.dataset.galleryOpen,b,instant(e));}));
-    listen($('#gallery-thumbs'),'click',e=>{const button=e.target.closest('[data-gallery-index]');if(!button)return;galleryIndex=Number(button.dataset.galleryIndex);renderGallery();});
-    listen($('#gallery-prev'),'click',()=>stepGallery(-1));listen($('#gallery-next'),'click',()=>stepGallery(1));swipe($('#gallery-image'),d=>stepGallery(d));
+    setupInlineGalleries();
     $$('dialog').forEach(dialog=>{
       let backdropDown=false;listen(dialog,'pointerdown',e=>{backdropDown=e.target===dialog;});
       listen(dialog,'click',e=>{
@@ -173,10 +161,9 @@
         backdropDown=false;
       });
       listen(dialog,'close',()=>afterClose(dialog));
-      listen(dialog,'keydown',e=>{if(dialog.id==='gallery-dialog'&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){e.preventDefault();stepGallery(e.key==='ArrowRight'?1:-1);}});
     });
     swipe($('[data-sheet-handle]'),d=>{if(d===-1)$('#booking-dialog')?.close();},{vertical:true});
-    setupNavigation();setupMotion();listen(reduced,'change',setupMotion);listen(desktop,'change',setupMotion);
+    setupNavigation();setupMotion();listen(reduced,'change',()=>{for(const entry of inlineGalleries.values())settleInlineGallery(entry);setupMotion();});listen(desktop,'change',setupMotion);
     // Every image has reserved geometry. Refreshing on each lazy image load can
     // interrupt a browser-native anchor scroll, so only fonts/content changes refresh.
     document.fonts?.ready.then(()=>{if(!lifecycle.signal.aborted)refresh();});
@@ -184,6 +171,7 @@
   }
   function cleanup(){
     if(currentDialog?.open){const dialog=currentDialog;dialog.close();afterClose(dialog);}
+    for(const entry of inlineGalleries.values())settleInlineGallery(entry);inlineGalleries.clear();
     lifecycle?.abort();observers.forEach(o=>o.disconnect());observers=[];destroyMotion(true);if(refreshFrame)cancelAnimationFrame(refreshFrame);refreshFrame=0;
   }
   init();window.addEventListener('pagehide',cleanup);window.addEventListener('pageshow',e=>{if(e.persisted)init();});
